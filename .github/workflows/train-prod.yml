@@ -65,9 +65,41 @@ jobs:
 
           echo "job_name=$JOB_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Stream prod training job
+      - name: Wait for prod training job
+        timeout-minutes: 60
         run: |
-          az ml job stream --name "${{ steps.train.outputs.job_name }}"
+          JOB_NAME="${{ steps.train.outputs.job_name }}"
+
+          while true; do
+            STATUS=$(az ml job show \
+              --name "$JOB_NAME" \
+              --query status \
+              --output tsv)
+
+            echo "Job status: $STATUS"
+
+            case "$STATUS" in
+              Completed)
+                echo "Prod training completed successfully."
+                break
+                ;;
+              Failed|Canceled|NotResponding)
+                echo "Prod training did not complete successfully: $STATUS" >&2
+                exit 1
+                ;;
+              "")
+                echo "Could not retrieve job status." >&2
+                exit 1
+                ;;
+              *)
+                sleep 30
+                ;;
+            esac
+          done
+
+
+
+
 
       - name: Download prod training outputs
         id: download
