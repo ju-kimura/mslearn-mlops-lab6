@@ -32,30 +32,27 @@ jobs:
         run: |
           az extension add -n ml -y
 
-      - name: Detect Azure ML workspace
+      - name: Configure Azure ML workspace
         id: detect
         run: |
-          RG_NAME=$(az group list --query "[?starts_with(name,'rg-ai300-l')].name | [0]" -o tsv)
-          if [ -z "$RG_NAME" ]; then
-            echo "No resource group starting with rg-ai300-l found." >&2
-            exit 1
-          fi
+          SUBSCRIPTION_ID="8d2804bb-2fc3-4151-8bd0-aef7dae18d25"
+          RG_NAME="rg-ai300-lab6-payg"
+          WS_NAME="mlw-ai300-lab6-payg"
+          ENDPOINT_NAME="diabetes-endpoint-lab6-payg"
 
-          WS_NAME=$(az ml workspace list --resource-group "$RG_NAME" --query "[?starts_with(name,'mlw-ai300-l')].name | [0]" -o tsv)
-          if [ -z "$WS_NAME" ]; then
-            echo "No workspace starting with mlw-ai300-l found in $RG_NAME." >&2
-            exit 1
-          fi
-
+          az account set --subscription "$SUBSCRIPTION_ID"
           az configure --defaults group="$RG_NAME" workspace="$WS_NAME"
+          az ml workspace show --name "$WS_NAME" --resource-group "$RG_NAME" --query name -o tsv
 
           echo "resource_group=$RG_NAME" >> "$GITHUB_OUTPUT"
           echo "workspace=$WS_NAME" >> "$GITHUB_OUTPUT"
+          echo "subscription_id=$SUBSCRIPTION_ID" >> "$GITHUB_OUTPUT"
+          echo "endpoint_name=$ENDPOINT_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Run training job in prod
         id: train
         run: |
-          JOB_NAME="diabetes-train-prod-${{ github.run_id }}"
+          JOB_NAME="diabetes-train-prod-${{ github.run_id }}-${{ github.run_attempt }}"
           echo "Running Azure ML job in prod: $JOB_NAME"
           az ml job create \
             -f src/job.yml \
@@ -65,9 +62,41 @@ jobs:
 
           echo "job_name=$JOB_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Stream prod training job
+      - name: Wait for prod training job
+        timeout-minutes: 60
         run: |
-          az ml job stream --name "${{ steps.train.outputs.job_name }}"
+          JOB_NAME="${{ steps.train.outputs.job_name }}"
+
+          while true; do
+            STATUS=$(az ml job show \
+              --name "$JOB_NAME" \
+              --query status \
+              --output tsv)
+
+            echo "Job status: $STATUS"
+
+            case "$STATUS" in
+              Completed)
+                echo "Prod training completed successfully."
+                break
+                ;;
+              Failed|Canceled|NotResponding)
+                echo "Prod training did not complete successfully: $STATUS" >&2
+                exit 1
+                ;;
+              "")
+                echo "Could not retrieve job status." >&2
+                exit 1
+                ;;
+              *)
+                sleep 30
+                ;;
+            esac
+          done
+
+
+
+
 
       - name: Download prod training outputs
         id: download
