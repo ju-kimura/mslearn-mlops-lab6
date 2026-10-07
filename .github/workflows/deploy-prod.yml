@@ -42,26 +42,17 @@ jobs:
         run: |
           az extension add -n ml -y
 
-      - name: Detect Azure ML workspace
+      - name: Configure Azure ML workspace
         id: detect
         run: |
-          RG_NAME=$(az group list --query "[?starts_with(name,'rg-ai300-l')].name | [0]" -o tsv)
-          if [ -z "$RG_NAME" ]; then
-            echo "No resource group starting with rg-ai300-l found." >&2
-            exit 1
-          fi
+          SUBSCRIPTION_ID="8d2804bb-2fc3-4151-8bd0-aef7dae18d25"
+          RG_NAME="rg-ai300-lab6-payg"
+          WS_NAME="mlw-ai300-lab6-payg"
+          ENDPOINT_NAME="diabetes-endpoint-lab6-payg"
 
-          WS_NAME=$(az ml workspace list --resource-group "$RG_NAME" --query "[?starts_with(name,'mlw-ai300-l')].name | [0]" -o tsv)
-          if [ -z "$WS_NAME" ]; then
-            echo "No workspace starting with mlw-ai300-l found in $RG_NAME." >&2
-            exit 1
-          fi
-
-          SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-
-          # unique, deterministic, region-safe name
-          SUFFIX="${WS_NAME#mlw-ai300-l}"
-          ENDPOINT_NAME="diabetes-endpoint-${SUFFIX:0:8}"
+          az account set --subscription "$SUBSCRIPTION_ID"
+          az configure --defaults group="$RG_NAME" workspace="$WS_NAME"
+          az ml workspace show --name "$WS_NAME" --resource-group "$RG_NAME" --query name -o tsv
 
           echo "resource_group=$RG_NAME" >> "$GITHUB_OUTPUT"
           echo "workspace=$WS_NAME" >> "$GITHUB_OUTPUT"
