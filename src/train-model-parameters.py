@@ -40,6 +40,11 @@ def main(args):
             path=model_path,
             signature=signature,
             input_example=example,
+            extra_pip_requirements=[
+                "azureml-ai-monitoring==1.0.0",
+                "azureml-inference-server-http==1.2.0",
+                "azureml-contrib-services==1.60.0",
+            ],
         )
         print(f"Saved MLflow model to {model_path}")
 
@@ -123,7 +128,7 @@ def parse_args():
     parser.add_argument("--training_data", dest='training_data',
                         type=str)
     parser.add_argument("--reg_rate", dest='reg_rate',
-                        type=float, default=0.1)
+                        type=float, default=0.2)
     parser.add_argument("--metrics_output", dest='metrics_output',
                         type=str, default=None)
 
