@@ -3,6 +3,8 @@ import glob
 import json
 import os
 import mlflow
+import mlflow.sklearn
+from mlflow.models import infer_signature
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -28,6 +30,19 @@ def main(args):
     if args.metrics_output:
         save_metrics(metrics, args.metrics_output)
 
+    if args.model_output:
+        os.makedirs(args.model_output, exist_ok=True)
+        model_path = os.path.join(args.model_output, "model")
+        example = X_train.iloc[:5]
+        signature = infer_signature(example, model.predict(example))
+        mlflow.sklearn.save_model(
+            sk_model=model,
+            path=model_path,
+            signature=signature,
+            input_example=example,
+        )
+        print(f"Saved MLflow model to {model_path}")
+
 def get_data(path):
     # function that reads the data from a file or a folder of CSV files
     print("Reading data...")
@@ -46,7 +61,7 @@ def get_data(path):
 def split_data(df):
     print("Splitting data...")
     X, y = df[['Pregnancies','PlasmaGlucose','DiastolicBloodPressure','TricepsThickness',
-    'SerumInsulin','BMI','DiabetesPedigree','Age']].values, df['Diabetic'].values
+    'SerumInsulin','BMI','DiabetesPedigree','Age']], df['Diabetic'].values
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=0)
 
@@ -108,11 +123,13 @@ def parse_args():
     parser.add_argument("--training_data", dest='training_data',
                         type=str)
     parser.add_argument("--reg_rate", dest='reg_rate',
-                        type=float, default=0.01)
+                        type=float, default=0.1)
     parser.add_argument("--metrics_output", dest='metrics_output',
                         type=str, default=None)
 
     # parse args
+    parser.add_argument("--model_output", type=str, default=None)
+
     args = parser.parse_args()
 
     # return args
