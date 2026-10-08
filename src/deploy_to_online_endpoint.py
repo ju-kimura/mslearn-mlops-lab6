@@ -64,7 +64,7 @@ def create_or_update_deployment(
 ) -> ManagedOnlineDeployment:
     model = ml_client.models.get(
         name="diabetes-prod-trained",
-        version="2",
+        version="3",
     )
     print(f"Using registered model: {model.name}:{model.version}", flush=True)
 
